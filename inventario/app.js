@@ -140,14 +140,14 @@ function onScanSuccess(decodedText) {
 
 async function startScanning() {
   scanner = new Html5Qrcode("reader");
+  const cameraConstraints = {
+    facingMode: "environment",
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+  };
   const config = {
     fps: 10,
     qrbox: { width: 280, height: 120 },
-    videoConstraints: {
-      facingMode: "environment",
-      width: { ideal: 1920 },
-      height: { ideal: 1080 },
-    },
     formatsToSupport: [
       Html5QrcodeSupportedFormats.EAN_13,
       Html5QrcodeSupportedFormats.EAN_8,
@@ -161,7 +161,7 @@ async function startScanning() {
   };
 
   try {
-    await scanner.start(undefined, config, onScanSuccess);
+    await scanner.start(cameraConstraints, config, onScanSuccess);
     startBtn.disabled = true;
     stopBtn.disabled = false;
   } catch (err) {
