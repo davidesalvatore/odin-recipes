@@ -45,14 +45,23 @@ function flashOverlay() {
 
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return { quantities: {}, history: [], names: {} };
+  if (!raw) return { quantities: {}, history: [], names: {}, lastScanned: {} };
   try {
     const parsed = JSON.parse(raw);
     if (!parsed.names) parsed.names = {};
+    if (!parsed.lastScanned) parsed.lastScanned = {};
     return parsed;
   } catch (e) {
-    return { quantities: {}, history: [], names: {} };
+    return { quantities: {}, history: [], names: {}, lastScanned: {} };
   }
+}
+
+function formatDateTime(isoString) {
+  if (!isoString) return "-";
+  return new Date(isoString).toLocaleString("it-IT", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
 }
 
 function saveState() {
@@ -112,6 +121,9 @@ function render() {
     const qtyTd = document.createElement("td");
     qtyTd.textContent = state.quantities[code];
 
+    const scannedAtTd = document.createElement("td");
+    scannedAtTd.textContent = formatDateTime(state.lastScanned[code]);
+
     const actionsTd = document.createElement("td");
     actionsTd.className = "row-actions";
 
@@ -128,7 +140,7 @@ function render() {
     deleteBtn.addEventListener("click", () => deleteCode(code));
 
     actionsTd.append(minusBtn, plusBtn, deleteBtn);
-    tr.append(nameTd, codeTd, qtyTd, actionsTd);
+    tr.append(nameTd, codeTd, qtyTd, scannedAtTd, actionsTd);
     inventoryBody.appendChild(tr);
   });
 
@@ -142,6 +154,7 @@ function render() {
 function addScan(code) {
   state.quantities[code] = (state.quantities[code] || 0) + 1;
   state.history.push(code);
+  state.lastScanned[code] = new Date().toISOString();
   saveState();
   render();
 
@@ -156,7 +169,10 @@ function undoLastScan() {
   if (state.history.length === 0) return;
   const code = state.history.pop();
   state.quantities[code] -= 1;
-  if (state.quantities[code] <= 0) delete state.quantities[code];
+  if (state.quantities[code] <= 0) {
+    delete state.quantities[code];
+    delete state.lastScanned[code];
+  }
   saveState();
   render();
   lastScanEl.textContent = `Annullata scansione: ${code}`;
@@ -164,13 +180,17 @@ function undoLastScan() {
 
 function adjustQuantity(code, delta) {
   state.quantities[code] = (state.quantities[code] || 0) + delta;
-  if (state.quantities[code] <= 0) delete state.quantities[code];
+  if (state.quantities[code] <= 0) {
+    delete state.quantities[code];
+    delete state.lastScanned[code];
+  }
   saveState();
   render();
 }
 
 function deleteCode(code) {
   delete state.quantities[code];
+  delete state.lastScanned[code];
   state.history = state.history.filter((c) => c !== code);
   saveState();
   render();
@@ -178,7 +198,7 @@ function deleteCode(code) {
 
 function resetInventory() {
   if (!confirm("Azzerare tutto l'inventario? L'azione non è reversibile.")) return;
-  state = { quantities: {}, history: [], names: {} };
+  state = { quantities: {}, history: [], names: {}, lastScanned: {} };
   saveState();
   render();
   lastScanEl.textContent = "Nessuna scansione ancora";
@@ -193,9 +213,14 @@ function csvEscape(value) {
 }
 
 function exportCsv() {
-  const rows = [["prodotto", "codice", "quantita"]];
+  const rows = [["prodotto", "codice", "quantita", "ultima_scansione"]];
   Object.keys(state.quantities).forEach((code) => {
-    rows.push([state.names[code] || "", code, state.quantities[code]]);
+    rows.push([
+      state.names[code] || "",
+      code,
+      state.quantities[code],
+      state.lastScanned[code] || "",
+    ]);
   });
   const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
