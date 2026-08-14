@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventario a codice a barre</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Inventario</h1>
+</header>
+
+<main>
+  <section id="scanner-section">
+    <div id="reader"></div>
+    <div class="scanner-controls">
+      <button id="start-btn" class="btn primary">Avvia scansione</button>
+      <button id="stop-btn" class="btn" disabled>Ferma scansione</button>
+    </div>
+    <p id="last-scan">Nessuna scansione ancora</p>
+  </section>
+
+  <section id="actions">
+    <button id="undo-btn" class="btn warning">Annulla ultima scansione</button>
+    <button id="export-btn" class="btn">Esporta CSV</button>
+    <button id="reset-btn" class="btn danger">Azzera inventario</button>
+  </section>
+
+  <section id="inventory-section">
+    <table id="inventory-table">
+      <thead>
+        <tr>
+          <th>Codice</th>
+          <th>Quantità</th>
+          <th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody id="inventory-body"></tbody>
+    </table>
+    <p id="empty-message">L'inventario è vuoto. Inizia a scansionare.</p>
+  </section>
+</main>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
