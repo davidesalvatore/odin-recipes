@@ -34,6 +34,11 @@ main {
   border-radius: 8px;
   overflow: hidden;
   background: #000;
+  /* Un elemento con position:fixed dentro non risponderebbe a
+     overflow:hidden: la trasformazione lo "intrappola" facendo
+     diventare questo box il suo contenitore. */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 #reader {
@@ -42,9 +47,11 @@ main {
 }
 
 #reader video {
+  position: absolute !important;
+  inset: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  object-fit: cover;
+  object-fit: cover !important;
 }
 
 #scan-overlay {
