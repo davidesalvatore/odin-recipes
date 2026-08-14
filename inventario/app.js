@@ -68,35 +68,34 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+const lookupErrors = {};
+
 async function lookupBook(isbn) {
-  try {
-    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
-    const data = await res.json();
-    const info = data.items && data.items[0] && data.items[0].volumeInfo;
-    return info && info.title ? info.title : null;
-  } catch (e) {
-    return null;
-  }
+  const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+  const data = await res.json();
+  const info = data.items && data.items[0] && data.items[0].volumeInfo;
+  return info && info.title ? info.title : null;
 }
 
 async function lookupFood(code) {
-  try {
-    const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
-    const data = await res.json();
-    return data.status === 1 && data.product && data.product.product_name
-      ? data.product.product_name
-      : null;
-  } catch (e) {
-    return null;
-  }
+  const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
+  const data = await res.json();
+  return data.status === 1 && data.product && data.product.product_name
+    ? data.product.product_name
+    : null;
 }
 
 async function lookupGeneric(code) {
+  const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
+  const data = await res.json();
+  return data.items && data.items[0] && data.items[0].title ? data.items[0].title : null;
+}
+
+async function tryLookup(fn, code) {
   try {
-    const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
-    const data = await res.json();
-    return data.items && data.items[0] && data.items[0].title ? data.items[0].title : null;
+    return await fn(code);
   } catch (e) {
+    lookupErrors[code] = e.message || String(e);
     return null;
   }
 }
@@ -104,8 +103,11 @@ async function lookupGeneric(code) {
 async function lookupProductName(code) {
   if (Object.prototype.hasOwnProperty.call(state.names, code)) return;
 
-  let name = /^97[89]\d{10}$/.test(code) ? await lookupBook(code) : await lookupFood(code);
-  if (!name) name = await lookupGeneric(code);
+  delete lookupErrors[code];
+  let name = /^97[89]\d{10}$/.test(code)
+    ? await tryLookup(lookupBook, code)
+    : await tryLookup(lookupFood, code);
+  if (!name) name = await tryLookup(lookupGeneric, code);
 
   state.names[code] = name;
   saveState();
@@ -132,7 +134,7 @@ function render() {
     if (name) {
       nameTd.textContent = name;
     } else if (name === null) {
-      nameTd.textContent = "Sconosciuto";
+      nameTd.textContent = lookupErrors[code] ? `Errore: ${lookupErrors[code]}` : "Sconosciuto";
       nameTd.className = "muted";
     } else {
       nameTd.textContent = "Ricerca…";
