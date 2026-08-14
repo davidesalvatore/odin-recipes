@@ -68,30 +68,54 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+async function lookupBook(isbn) {
+  try {
+    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+    const data = await res.json();
+    const info = data.items && data.items[0] && data.items[0].volumeInfo;
+    return info && info.title ? info.title : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function lookupFood(code) {
+  try {
+    const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
+    const data = await res.json();
+    return data.status === 1 && data.product && data.product.product_name
+      ? data.product.product_name
+      : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function lookupGeneric(code) {
+  try {
+    const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
+    const data = await res.json();
+    return data.items && data.items[0] && data.items[0].title ? data.items[0].title : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function lookupProductName(code) {
   if (Object.prototype.hasOwnProperty.call(state.names, code)) return;
 
-  let name = null;
-  try {
-    if (/^97[89]\d{10}$/.test(code)) {
-      const res = await fetch(
-        `https://openlibrary.org/api/books?bibkeys=ISBN:${code}&format=json&jscmd=data`
-      );
-      const data = await res.json();
-      const book = data[`ISBN:${code}`];
-      if (book && book.title) name = book.title;
-    } else {
-      const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
-      const data = await res.json();
-      if (data.status === 1 && data.product && data.product.product_name) {
-        name = data.product.product_name;
-      }
-    }
-  } catch (e) {
-    return; // errore di rete: si può ritentare a una scansione successiva
-  }
+  let name = /^97[89]\d{10}$/.test(code) ? await lookupBook(code) : await lookupFood(code);
+  if (!name) name = await lookupGeneric(code);
 
   state.names[code] = name;
+  saveState();
+  render();
+}
+
+function renameProduct(code) {
+  const input = prompt("Nome prodotto:", state.names[code] || "");
+  if (input === null) return;
+  state.names[code] = input.trim() || null;
   saveState();
   render();
 }
@@ -139,7 +163,11 @@ function render() {
     deleteBtn.textContent = "Elimina";
     deleteBtn.addEventListener("click", () => deleteCode(code));
 
-    actionsTd.append(minusBtn, plusBtn, deleteBtn);
+    const renameBtn = document.createElement("button");
+    renameBtn.textContent = "Rinomina";
+    renameBtn.addEventListener("click", () => renameProduct(code));
+
+    actionsTd.append(minusBtn, plusBtn, renameBtn, deleteBtn);
     tr.append(nameTd, codeTd, qtyTd, scannedAtTd, actionsTd);
     inventoryBody.appendChild(tr);
   });
