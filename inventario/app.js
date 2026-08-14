@@ -140,11 +140,7 @@ function onScanSuccess(decodedText) {
 
 async function startScanning() {
   scanner = new Html5Qrcode("reader");
-  const cameraConstraints = {
-    facingMode: "environment",
-    width: { ideal: 1920 },
-    height: { ideal: 1080 },
-  };
+  const cameraConstraints = { facingMode: "environment" };
   const config = {
     fps: 10,
     qrbox: { width: 280, height: 120 },
@@ -164,6 +160,15 @@ async function startScanning() {
     await scanner.start(cameraConstraints, config, onScanSuccess);
     startBtn.disabled = true;
     stopBtn.disabled = false;
+
+    try {
+      await scanner.applyVideoConstraints({
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      });
+    } catch (constraintErr) {
+      // risoluzione più alta non disponibile su questo dispositivo, si continua con quella di default
+    }
   } catch (err) {
     alert("Impossibile avviare la fotocamera: " + err);
   }
