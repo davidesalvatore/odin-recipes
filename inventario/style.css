@@ -162,6 +162,11 @@ th, td {
   cursor: pointer;
 }
 
+.muted {
+  color: #9aa5b1;
+  font-style: italic;
+}
+
 #empty-message {
   text-align: center;
   color: #9aa5b1;

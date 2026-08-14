@@ -45,16 +45,46 @@ function flashOverlay() {
 
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return { quantities: {}, history: [] };
+  if (!raw) return { quantities: {}, history: [], names: {} };
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed.names) parsed.names = {};
+    return parsed;
   } catch (e) {
-    return { quantities: {}, history: [] };
+    return { quantities: {}, history: [], names: {} };
   }
 }
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+async function lookupProductName(code) {
+  if (Object.prototype.hasOwnProperty.call(state.names, code)) return;
+
+  let name = null;
+  try {
+    if (/^97[89]\d{10}$/.test(code)) {
+      const res = await fetch(
+        `https://openlibrary.org/api/books?bibkeys=ISBN:${code}&format=json&jscmd=data`
+      );
+      const data = await res.json();
+      const book = data[`ISBN:${code}`];
+      if (book && book.title) name = book.title;
+    } else {
+      const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
+      const data = await res.json();
+      if (data.status === 1 && data.product && data.product.product_name) {
+        name = data.product.product_name;
+      }
+    }
+  } catch (e) {
+    return; // errore di rete: si può ritentare a una scansione successiva
+  }
+
+  state.names[code] = name;
+  saveState();
+  render();
 }
 
 function render() {
@@ -63,6 +93,18 @@ function render() {
 
   codes.forEach((code) => {
     const tr = document.createElement("tr");
+
+    const nameTd = document.createElement("td");
+    const name = state.names[code];
+    if (name) {
+      nameTd.textContent = name;
+    } else if (name === null) {
+      nameTd.textContent = "Sconosciuto";
+      nameTd.className = "muted";
+    } else {
+      nameTd.textContent = "Ricerca…";
+      nameTd.className = "muted";
+    }
 
     const codeTd = document.createElement("td");
     codeTd.textContent = code;
@@ -86,7 +128,7 @@ function render() {
     deleteBtn.addEventListener("click", () => deleteCode(code));
 
     actionsTd.append(minusBtn, plusBtn, deleteBtn);
-    tr.append(codeTd, qtyTd, actionsTd);
+    tr.append(nameTd, codeTd, qtyTd, actionsTd);
     inventoryBody.appendChild(tr);
   });
 
@@ -107,6 +149,7 @@ function addScan(code) {
   if (navigator.vibrate) navigator.vibrate(100);
   playBeep();
   flashOverlay();
+  lookupProductName(code);
 }
 
 function undoLastScan() {
@@ -135,18 +178,26 @@ function deleteCode(code) {
 
 function resetInventory() {
   if (!confirm("Azzerare tutto l'inventario? L'azione non è reversibile.")) return;
-  state = { quantities: {}, history: [] };
+  state = { quantities: {}, history: [], names: {} };
   saveState();
   render();
   lastScanEl.textContent = "Nessuna scansione ancora";
 }
 
+function csvEscape(value) {
+  const str = String(value ?? "");
+  if (/[",\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
 function exportCsv() {
-  const rows = [["codice", "quantita"]];
+  const rows = [["prodotto", "codice", "quantita"]];
   Object.keys(state.quantities).forEach((code) => {
-    rows.push([code, state.quantities[code]]);
+    rows.push([state.names[code] || "", code, state.quantities[code]]);
   });
-  const csv = rows.map((row) => row.join(",")).join("\n");
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
