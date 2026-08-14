@@ -5,8 +5,11 @@ let state = loadState();
 let scanner = null;
 let lastScannedCode = null;
 let lastScannedAt = 0;
+let audioCtx = null;
+let overlayTimeout = null;
 
 const readerEl = document.getElementById("reader");
+const scanOverlayEl = document.getElementById("scan-overlay");
 const startBtn = document.getElementById("start-btn");
 const stopBtn = document.getElementById("stop-btn");
 const undoBtn = document.getElementById("undo-btn");
@@ -16,6 +19,29 @@ const lastScanEl = document.getElementById("last-scan");
 const inventoryBody = document.getElementById("inventory-body");
 const inventoryTable = document.getElementById("inventory-table");
 const emptyMessage = document.getElementById("empty-message");
+
+function playBeep() {
+  if (!audioCtx) return;
+  try {
+    const oscillator = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = 880;
+    gain.gain.value = 0.2;
+    oscillator.connect(gain);
+    gain.connect(audioCtx.destination);
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.15);
+  } catch (e) {
+    // audio non disponibile
+  }
+}
+
+function flashOverlay() {
+  scanOverlayEl.classList.add("visible");
+  clearTimeout(overlayTimeout);
+  overlayTimeout = setTimeout(() => scanOverlayEl.classList.remove("visible"), 400);
+}
 
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -79,6 +105,8 @@ function addScan(code) {
 
   lastScanEl.textContent = `Ultima scansione: ${code}`;
   if (navigator.vibrate) navigator.vibrate(100);
+  playBeep();
+  flashOverlay();
 }
 
 function undoLastScan() {
@@ -139,6 +167,16 @@ function onScanSuccess(decodedText) {
 }
 
 async function startScanning() {
+  if (!audioCtx) {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      // audio non disponibile su questo dispositivo
+    }
+  } else if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+
   scanner = new Html5Qrcode("reader");
   const cameraConstraints = { facingMode: "environment" };
   const config = {
